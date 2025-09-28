@@ -13,5 +13,5 @@ class Message(models.Model):
 
 
 class Notif(models.Model):
-    reciver = models.ForeignKey(User, on_delete=models.CASCADE)
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.ForeignKey(Message, on_delete=models.CASCADE)

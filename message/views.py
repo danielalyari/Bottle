@@ -16,8 +16,7 @@ class SendMessageView(CreateAPIView):
 
     def perform_create(self, serializer):
         saved_message = serializer.save()
-        sender_id = saved_message.sender
-        sender_profile = UserProfile.objects.get(user_id=sender_id)
+        sender_profile = UserProfile.objects.get(user=saved_message.sender)
         sender_profile.coins -= 10
         sender_profile.save()
 
@@ -43,6 +42,7 @@ class ReceiveMessageView(RetrieveAPIView):
         sender_profile.coins -= 30
         sender_profile.save()
 
+        serializer = self.get_serializer(message)
         return Response(serializer.data)
 
 
@@ -57,11 +57,10 @@ class ReplyToMessage(APIView):
             sender=request.user,
             receiver=message.sender,
             content=reply_content,
-            reply_to=kwargs['pk']
+            reply_to=message
         )
 
-        sender_id = message.sender
-        sender_profile = UserProfile.objects.get(user_id=sender_id)
+        sender_profile = UserProfile.objects.get(user=request.user)
         sender_profile.coins -= 20
         sender_profile.save()
 
@@ -87,9 +86,8 @@ class AddCoinsView(APIView):
     permission_classes = [permissions.IsAdminUser]
 
     def post(self, request):
-        user_profile = get_object_or_404(
-            UserProfile, user=request.data.get("user_id")
-        )
+        user_profile = get_object_or_404(UserProfile, user_id=request.data.get("user_id"))
+
         coins_to_add = request.data.get("coins", 0)
         user_profile.coins += coins_to_add
         user_profile.save()
@@ -100,9 +98,8 @@ class BanUserView(APIView):
     permission_classes = [permissions.IsAdminUser]
 
     def post(self, request):
-        user_profile = get_object_or_404(
-            UserProfile, user=request.data.get("user_id")
-        )
+        user_profile = get_object_or_404(UserProfile, user_id=request.data.get("user_id"))
+
         user_profile.is_banned = True
         user_profile.save()
         return Response({"status": "success", "message": "User banned successfully."})
