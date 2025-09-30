@@ -19,8 +19,7 @@ class SendMessageView(CreateAPIView):
     def perform_create(self, serializer):
         saved_message = serializer.save()
         sender_profile = UserProfile.objects.get(user=saved_message.sender)
-        sender_profile.coins -= 10
-        sender_profile.save()
+        sender_profile.decrease_coins(30)
 
         followers = Friend.objects.filter(
             to_user=saved_message.sender).select_related('from_user')
@@ -39,9 +38,6 @@ class ReceiveRandomMessageView(GenericAPIView):
     def post(self, request, *args, **kwargs):
         user = request.user
         profile = UserProfile.objects.get(user=user)
-
-        if profile.coins < 30:
-            return Response({'detail': 'Not enough coins.'}, status=status.HTTP_400_BAD_REQUEST)
 
         qs = Message.objects.filter(receiver__isnull=True).exclude(sender=user)
 
@@ -75,11 +71,7 @@ class RevealSenderView(GenericAPIView):
         if message.receiver_id != user.id:
             return Response({'detail': 'You are not the receiver of this message.'}, status=status.HTTP_403_FORBIDDEN)
 
-        if profile.coins < 30:
-            return Response({'detail': 'Not enough coins.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        profile.coins -= 30
-        profile.save()
+        profile.decrease_coins(30)
 
         serializer = self.get_serializer(message, context={'show_sender': True})
         return Response({
@@ -103,8 +95,7 @@ class ReplyToMessage(APIView):
         )
 
         sender_profile = UserProfile.objects.get(user=request.user)
-        sender_profile.coins -= 20
-        sender_profile.save()
+        sender_profile.decrease_coins(30)
 
         return Response(
             {"status": "success", "message": "Reply sent successfully."},
