@@ -1,5 +1,7 @@
+import random
 from django.shortcuts import get_object_or_404
-from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView, DestroyAPIView, UpdateAPIView
+from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView, DestroyAPIView, UpdateAPIView, \
+    GenericAPIView
 from rest_framework.views import APIView
 from rest_framework import status
 from rest_framework.response import Response
@@ -30,20 +32,60 @@ class SendMessageView(CreateAPIView):
         Notif.objects.bulk_create(notifications)
 
 
-class ReceiveMessageView(RetrieveAPIView):
-    queryset = Message.objects.all()
-    serializer_class = MessageSerializer
+class ReceiveRandomMessageView(GenericAPIView):
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = MessageSerializer
 
-    def retrieve(self, request, *args, **kwargs):
-        message = self.get_object()
-        receiver_id = message.receiver
-        sender_profile = UserProfile.objects.get(user_id=receiver_id)
-        sender_profile.coins -= 30
-        sender_profile.save()
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        profile = UserProfile.objects.get(user=user)
+
+        if profile.coins < 30:
+            return Response({'detail': 'Not enough coins.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = Message.objects.filter(receiver__isnull=True).exclude(sender=user)
+
+        if not qs.exists():
+            return Response({'detail': 'No available messages.'}, status=status.HTTP_404_NOT_FOUND)
+
+        message = random.choice(list(qs))
+        message.receiver = user
+        message.save()
 
         serializer = self.get_serializer(message)
-        return Response(serializer.data)
+        return Response({
+            'message': serializer.data,
+            'coins_left': profile.coins
+        }, status=status.HTTP_200_OK)
+
+
+class RevealSenderView(GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = MessageSerializer
+
+    def post(self, request, pk, *args, **kwargs):
+        user = request.user
+        profile = UserProfile.objects.get(user=user)
+
+        if profile.is_banned:
+            return Response({'detail': 'You are banned.'}, status=status.HTTP_403_FORBIDDEN)
+
+        message = get_object_or_404(Message, pk=pk)
+
+        if message.receiver_id != user.id:
+            return Response({'detail': 'You are not the receiver of this message.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if profile.coins < 30:
+            return Response({'detail': 'Not enough coins.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        profile.coins -= 30
+        profile.save()
+
+        serializer = self.get_serializer(message, context={'show_sender': True})
+        return Response({
+            'message': serializer.data,
+            'coins_left': profile.coins
+        }, status=status.HTTP_200_OK)
 
 
 class ReplyToMessage(APIView):
