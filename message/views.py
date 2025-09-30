@@ -1,7 +1,6 @@
 import random
 from django.shortcuts import get_object_or_404
-from rest_framework.generics import CreateAPIView, RetrieveAPIView, ListAPIView, DestroyAPIView, UpdateAPIView, \
-    GenericAPIView
+from rest_framework.generics import CreateAPIView, ListAPIView, DestroyAPIView, GenericAPIView
 from rest_framework.views import APIView
 from rest_framework import status
 from rest_framework.response import Response
@@ -9,12 +8,13 @@ from message.models import Message, Notif
 from user.models import UserProfile, Friend
 from message.serializers import MessageSerializer
 from rest_framework import permissions
+from user.permissions import NotBannedPermission
 
 
 class SendMessageView(CreateAPIView):
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, NotBannedPermission]
 
     def perform_create(self, serializer):
         saved_message = serializer.save()
@@ -33,7 +33,7 @@ class SendMessageView(CreateAPIView):
 
 
 class ReceiveRandomMessageView(GenericAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, NotBannedPermission]
     serializer_class = MessageSerializer
 
     def post(self, request, *args, **kwargs):
@@ -60,7 +60,7 @@ class ReceiveRandomMessageView(GenericAPIView):
 
 
 class RevealSenderView(GenericAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, NotBannedPermission]
     serializer_class = MessageSerializer
 
     def post(self, request, pk, *args, **kwargs):
@@ -89,7 +89,7 @@ class RevealSenderView(GenericAPIView):
 
 
 class ReplyToMessage(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, NotBannedPermission]
 
     def post(self, request, *args, **kwargs):
         message = get_object_or_404(Message, pk=kwargs['pk'])
@@ -118,7 +118,7 @@ class ListMessagesView(ListAPIView):
     permission_classes = [permissions.IsAdminUser]
 
 
-class ModelDeleteView(DestroyAPIView):
+class MessageDeleteView(DestroyAPIView):
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAdminUser]
